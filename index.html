@@ -1,0 +1,115 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Dreamcast Web Emulator</title>
+<style>
+  :root { color-scheme: dark; }
+  * { box-sizing: border-box; }
+  body {
+    margin: 0; min-height: 100vh; background: #0b0d12; color: #e8eaf0;
+    font-family: system-ui, -apple-system, Segoe UI, Roboto, sans-serif;
+    display: flex; flex-direction: column; align-items: center;
+  }
+  header { padding: 20px 16px 8px; text-align: center; }
+  h1 { margin: 0; font-size: 1.5rem; letter-spacing: .04em; }
+  h1 span { color: #ff7a1a; }
+  p.sub { margin: 6px 0 0; color: #8b93a7; font-size: .9rem; }
+  #setup {
+    width: min(560px, 92vw); margin: 16px 0; padding: 20px;
+    background: #141824; border: 1px solid #252b3b; border-radius: 14px;
+  }
+  .row { margin-bottom: 16px; }
+  label { display: block; font-weight: 600; margin-bottom: 6px; }
+  small { color: #8b93a7; display: block; margin-top: 4px; }
+  input[type=file] {
+    width: 100%; padding: 10px; background: #0b0d12; color: inherit;
+    border: 1px dashed #3a4258; border-radius: 8px;
+  }
+  button {
+    width: 100%; padding: 12px; font-size: 1rem; font-weight: 700;
+    background: #ff7a1a; color: #1a1007; border: 0; border-radius: 10px; cursor: pointer;
+  }
+  button:disabled { background: #3a4258; color: #8b93a7; cursor: not-allowed; }
+  #stage { width: min(960px, 96vw); aspect-ratio: 4 / 3; display: none; margin-bottom: 20px; }
+  #game { width: 100%; height: 100%; }
+  footer { color: #5f677b; font-size: .75rem; padding: 0 16px 20px; text-align: center; max-width: 640px; }
+  #err { color: #ff6b6b; margin-top: 10px; display: none; font-size: .9rem; }
+</style>
+</head>
+<body>
+<header>
+  <h1><span>Dreamcast</span> Web Emulator</h1>
+  <p class="sub">Flycast core running in your browser (via EmulatorJS / WebAssembly)</p>
+</header>
+
+<section id="setup">
+  <div class="row">
+    <label for="gameFile">Game file (required)</label>
+    <input id="gameFile" type="file" accept=".cdi,.gdi,.chd,.cue,.bin,.iso,.zip,.7z">
+    <small>Use a dump of a disc you own. Supported: .cdi, .chd, .cue/.bin, .iso, or a .zip/.7z of the disc. For multi-file .gdi games, zip all the files together.</small>
+  </div>
+  <div class="row">
+    <label for="biosFile">BIOS (optional)</label>
+    <input id="biosFile" type="file" accept=".bin,.zip">
+    <small>Flycast has a built-in HLE BIOS, so this is usually not needed. If you have dc_boot.bin, you can add it for better compatibility.</small>
+  </div>
+  <button id="start" disabled>Start</button>
+  <div id="err"></div>
+</section>
+
+<div id="stage"><div id="game"></div></div>
+
+<footer>
+  This page ships no games or BIOS files. Flycast is GPLv2 software; EmulatorJS is loaded from cdn.emulatorjs.org, so an internet connection is required.
+  Keyboard: arrows = D-pad, X/Z/S/A = face buttons, Enter = Start. Gamepads are auto-detected.
+</footer>
+
+<script>
+(function () {
+  const gameInput = document.getElementById('gameFile');
+  const biosInput = document.getElementById('biosFile');
+  const startBtn  = document.getElementById('start');
+  const errBox    = document.getElementById('err');
+
+  gameInput.addEventListener('change', () => { startBtn.disabled = !gameInput.files.length; });
+
+  startBtn.addEventListener('click', () => {
+    const game = gameInput.files[0];
+    if (!game) return;
+    startBtn.disabled = true;
+    startBtn.textContent = 'Loading…';
+
+    document.getElementById('setup').style.display = 'none';
+    document.getElementById('stage').style.display = 'block';
+
+    // EmulatorJS configuration (globals read by loader.js)
+    window.EJS_player = '#game';
+    window.EJS_core = 'segaDC';               // Flycast core
+    window.EJS_pathtodata = 'https://cdn.emulatorjs.org/stable/data/';
+    window.EJS_gameUrl = URL.createObjectURL(game);
+    window.EJS_gameName = game.name;          // keeps the file extension for core detection
+    window.EJS_startOnLoaded = true;
+    window.EJS_color = '#ff7a1a';
+    window.EJS_threads = false;               // works without special COOP/COEP headers
+
+    const bios = biosInput.files[0];
+    if (bios) window.EJS_biosUrl = URL.createObjectURL(bios);
+
+    const s = document.createElement('script');
+    s.src = window.EJS_pathtodata + 'loader.js';
+    s.onerror = () => {
+      document.getElementById('stage').style.display = 'none';
+      document.getElementById('setup').style.display = 'block';
+      startBtn.disabled = false;
+      startBtn.textContent = 'Start';
+      errBox.style.display = 'block';
+      errBox.textContent = 'Could not load EmulatorJS from the CDN. Check your internet connection and try again.';
+    };
+    document.body.appendChild(s);
+  });
+})();
+</script>
+</body>
+</html>
